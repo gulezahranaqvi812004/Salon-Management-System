@@ -10,17 +10,31 @@ class ReportingScreen extends StatefulWidget {
 
 class _ReportingScreenState extends State<ReportingScreen> {
   bool isPersonSelected = true; // Toggle between 'Person' and 'Cash Flow'
-  String? _selectedServiceType;
+  bool isCashInSelected = true; // Toggle between 'Cash In' and 'Cash Out'
+  String? _selectedServiceType; // For 'Cash In'
+  String? _selectedExpenseCategory; // For 'Cash Out'
   String? _selectedDate;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Filter controllers
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _serviceTypeController = TextEditingController();
+  final TextEditingController _expenseCategoryController = TextEditingController();
 
-  // Service types for filtering
+  // Service types for filtering (Cash In)
   final List<String> _serviceTypes = [
     'Haircut', 'Facial', 'Massage', 'Manicure', 'Pedicure', 'Hair Coloring', 'Other'
+  ];
+
+  // Expense categories for filtering (Cash Out)
+  final List<String> _expenseCategories = [
+    'Salary',
+    'Miscellaneous',
+    'Supplies',
+    'Rent',
+    'Utilities',
+    'Staff Payment',
+    'Other'
   ];
 
   @override
@@ -34,27 +48,39 @@ class _ReportingScreenState extends State<ReportingScreen> {
     return _firestore.collection('persons').snapshots();
   }
 
-  // Function to fetch Cash Flow data (Cash In and Cash Out)
-  Stream<QuerySnapshot> _getCashFlowData() {
-    Query query = _firestore.collectionGroup('cash_in');
-    // Apply Date filter
+  // Function to fetch Cash Flow data (Cash In)
+  Stream<QuerySnapshot> _getCashInData() {
+    CollectionReference collection = _firestore.collection('cash_in');
+
+    Query query = collection;
+
+    // Apply Date filter if selected
     if (_selectedDate != null && _selectedDate!.isNotEmpty) {
       query = query.where('date', isEqualTo: _selectedDate);
     }
-    // Apply Service Type filter
+
+    // Apply Service Type filter if selected
     if (_selectedServiceType != null && _selectedServiceType!.isNotEmpty) {
       query = query.where('serviceType', isEqualTo: _selectedServiceType);
     }
+
     return query.snapshots();
   }
 
   // Function to fetch Cash Out data
   Stream<QuerySnapshot> _getCashOutData() {
     Query query = _firestore.collection('cash_out');
-    // Apply Date filter
+
+    // Apply Date filter if selected
     if (_selectedDate != null && _selectedDate!.isNotEmpty) {
       query = query.where('date', isEqualTo: _selectedDate);
     }
+
+    // Apply Expense Category filter if selected
+    if (_selectedExpenseCategory != null && _selectedExpenseCategory!.isNotEmpty) {
+      query = query.where('expenseCategory', isEqualTo: _selectedExpenseCategory);
+    }
+
     return query.snapshots();
   }
 
@@ -90,7 +116,29 @@ class _ReportingScreenState extends State<ReportingScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Filters for Cash Flow (Date & Service Type)
+            // Toggle between Cash In and Cash Out
+            if (!isPersonSelected)
+              ToggleButtons(
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Text('Cash In'),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Text('Cash Out'),
+                  ),
+                ],
+                isSelected: [isCashInSelected, !isCashInSelected],
+                onPressed: (index) {
+                  setState(() {
+                    isCashInSelected = index == 0;
+                  });
+                },
+              ),
+            const SizedBox(height: 20),
+
+            // Filters for Cash Flow (Date & Service Type or Expense Category)
             if (!isPersonSelected) ...[
               TextFormField(
                 controller: _dateController,
@@ -112,21 +160,41 @@ class _ReportingScreenState extends State<ReportingScreen> {
                 },
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Service Type'),
-                value: _selectedServiceType,
-                items: _serviceTypes.map((String serviceType) {
-                  return DropdownMenuItem<String>(
-                    value: serviceType,
-                    child: Text(serviceType),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedServiceType = newValue;
-                  });
-                },
-              ),
+              if (isCashInSelected) ...[
+                // Cash In filters (Service Type)
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Service Type'),
+                  value: _selectedServiceType,
+                  items: _serviceTypes.map((String serviceType) {
+                    return DropdownMenuItem<String>(
+                      value: serviceType,
+                      child: Text(serviceType),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedServiceType = newValue;
+                    });
+                  },
+                ),
+              ] else ...[
+                // Cash Out filters (Expense Category)
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Expense Category'),
+                  value: _selectedExpenseCategory,
+                  items: _expenseCategories.map((String expenseCategory) {
+                    return DropdownMenuItem<String>(
+                      value: expenseCategory,
+                      child: Text(expenseCategory),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedExpenseCategory = newValue;
+                    });
+                  },
+                ),
+              ],
               const SizedBox(height: 20),
             ],
 
@@ -134,7 +202,9 @@ class _ReportingScreenState extends State<ReportingScreen> {
             Expanded(
               child: isPersonSelected
                   ? _buildPersonList() // Person data display
-                  : _buildCashFlowList(), // Cash Flow data display
+                  : isCashInSelected
+                  ? _buildCashInList() // Cash In data display
+                  : _buildCashOutList(), // Cash Out data display
             ),
           ],
         ),
@@ -171,78 +241,61 @@ class _ReportingScreenState extends State<ReportingScreen> {
     );
   }
 
-  // Function to build Cash Flow list
-  Widget _buildCashFlowList() {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          TabBar(
-            tabs: const [
-              Tab(text: 'Cash In'),
-              Tab(text: 'Cash Out'),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                // Cash In
-                StreamBuilder<QuerySnapshot>(
-                  stream: _getCashFlowData(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(child: Text('No cash in records.'));
-                    }
-                    final cashIn = snapshot.data!.docs;
-                    return ListView.builder(
-                      itemCount: cashIn.length,
-                      itemBuilder: (context, index) {
-                        final transaction = cashIn[index];
-                        return ListTile(
-                          title: Text('Amount: ${transaction['amount']}'),
-                          subtitle: Text('Service: ${transaction['serviceType']}, Date: ${transaction['date']}'),
-                        );
-                      },
-                    );
-                  },
-                ),
-                // Cash Out
-                StreamBuilder<QuerySnapshot>(
-                  stream: _getCashOutData(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(child: Text('No cash out records.'));
-                    }
-                    final cashOut = snapshot.data!.docs;
-                    return ListView.builder(
-                      itemCount: cashOut.length,
-                      itemBuilder: (context, index) {
-                        final transaction = cashOut[index];
-                        return ListTile(
-                          title: Text('Amount: ${transaction['amount']}'),
-                          subtitle: Text('Category: ${transaction['expenseCategory']}, Date: ${transaction['date']}'),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  // Function to build Cash In list
+  Widget _buildCashInList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _getCashInData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('No cash in records.'));
+        }
+        final cashIn = snapshot.data!.docs;
+        return ListView.builder(
+          itemCount: cashIn.length,
+          itemBuilder: (context, index) {
+            final transaction = cashIn[index];
+            return ListTile(
+              title: Text('Amount: ${transaction['amount']}'),
+              subtitle: Text('Service: ${transaction['serviceType']}, Date: ${transaction['date']}'),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Function to build Cash Out list
+  Widget _buildCashOutList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _getCashOutData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('No cash out records.'));
+        }
+        final cashOut = snapshot.data!.docs;
+        return ListView.builder(
+          itemCount: cashOut.length,
+          itemBuilder: (context, index) {
+            final transaction = cashOut[index];
+            return ListTile(
+              title: Text('Amount: ${transaction['amount']}'),
+              subtitle: Text('Category: ${transaction['expenseCategory']}, Date: ${transaction['date']}'),
+            );
+          },
+        );
+      },
     );
   }
 }
