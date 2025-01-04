@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:salon_management_system/screens/add_person_screen.dart';
-import 'package:salon_management_system/screens/cash_out_screen.dart';
+// import 'package:salon_management_system/screens/cash_out_screen.dart';
 import 'package:salon_management_system/screens/cashflow_screen.dart';
 import 'package:salon_management_system/screens/home_screen.dart';
 import 'package:salon_management_system/screens/reporting_screen.dart';
