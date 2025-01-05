@@ -18,12 +18,16 @@ class _ReportingScreenState extends State<ReportingScreen> {
 
   // Filter controllers
   final TextEditingController _dateController = TextEditingController();
-  final TextEditingController _serviceTypeController = TextEditingController();
-  final TextEditingController _expenseCategoryController = TextEditingController();
 
   // Service types for filtering (Cash In)
   final List<String> _serviceTypes = [
-    'Haircut', 'Facial', 'Massage', 'Manicure', 'Pedicure', 'Hair Coloring', 'Other'
+    'Haircut',
+    'Facial',
+    'Massage',
+    'Manicure',
+    'Pedicure',
+    'Hair Coloring',
+    'Other'
   ];
 
   // Expense categories for filtering (Cash Out)
@@ -40,19 +44,13 @@ class _ReportingScreenState extends State<ReportingScreen> {
   @override
   void initState() {
     super.initState();
-    _dateController.text = DateTime.now().toLocal().toString().split(' ')[0]; // Default to today's date
-  }
-
-  // Function to fetch Persons data
-  Stream<QuerySnapshot> _getPersonsData() {
-    return _firestore.collection('persons').snapshots();
+    _dateController.text =
+    DateTime.now().toLocal().toString().split(' ')[0]; // Default to today's date
   }
 
   // Function to fetch Cash Flow data (Cash In)
   Stream<QuerySnapshot> _getCashInData() {
-    CollectionReference collection = _firestore.collection('cash_in');
-
-    Query query = collection;
+    Query query = _firestore.collection('cash_in');
 
     // Apply Date filter if selected
     if (_selectedDate != null && _selectedDate!.isNotEmpty) {
@@ -67,7 +65,7 @@ class _ReportingScreenState extends State<ReportingScreen> {
     return query.snapshots();
   }
 
-  // Function to fetch Cash Out data
+  // Function to fetch Cash Flow data (Cash Out)
   Stream<QuerySnapshot> _getCashOutData() {
     Query query = _firestore.collection('cash_out');
 
@@ -77,7 +75,8 @@ class _ReportingScreenState extends State<ReportingScreen> {
     }
 
     // Apply Expense Category filter if selected
-    if (_selectedExpenseCategory != null && _selectedExpenseCategory!.isNotEmpty) {
+    if (_selectedExpenseCategory != null &&
+        _selectedExpenseCategory!.isNotEmpty) {
       query = query.where('expenseCategory', isEqualTo: _selectedExpenseCategory);
     }
 
@@ -153,7 +152,8 @@ class _ReportingScreenState extends State<ReportingScreen> {
                   );
                   if (pickedDate != null) {
                     setState(() {
-                      _dateController.text = pickedDate.toLocal().toString().split(' ')[0];
+                      _dateController.text =
+                      pickedDate.toLocal().toString().split(' ')[0];
                       _selectedDate = _dateController.text;
                     });
                   }
@@ -161,7 +161,6 @@ class _ReportingScreenState extends State<ReportingScreen> {
               ),
               const SizedBox(height: 10),
               if (isCashInSelected) ...[
-                // Cash In filters (Service Type)
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Service Type'),
                   value: _selectedServiceType,
@@ -178,7 +177,6 @@ class _ReportingScreenState extends State<ReportingScreen> {
                   },
                 ),
               ] else ...[
-                // Cash Out filters (Expense Category)
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Expense Category'),
                   value: _selectedExpenseCategory,
@@ -196,15 +194,24 @@ class _ReportingScreenState extends State<ReportingScreen> {
                 ),
               ],
               const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    // Trigger filtering based on selected date
+                  });
+                },
+                child: const Text('Search'),
+              ),
+              const SizedBox(height: 20),
             ],
 
             // Display the data based on selection
             Expanded(
               child: isPersonSelected
-                  ? _buildPersonList() // Person data display
+                  ? _buildPersonList()
                   : isCashInSelected
-                  ? _buildCashInList() // Cash In data display
-                  : _buildCashOutList(), // Cash Out data display
+                  ? _buildCashInList()
+                  : _buildCashOutList(),
             ),
           ],
         ),
@@ -215,7 +222,7 @@ class _ReportingScreenState extends State<ReportingScreen> {
   // Function to build Person list
   Widget _buildPersonList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _getPersonsData(),
+      stream: _firestore.collection('persons').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -262,7 +269,8 @@ class _ReportingScreenState extends State<ReportingScreen> {
             final transaction = cashIn[index];
             return ListTile(
               title: Text('Amount: ${transaction['amount']}'),
-              subtitle: Text('Service: ${transaction['serviceType']}, Date: ${transaction['date']}'),
+              subtitle: Text(
+                  'Service: ${transaction['serviceType']}, Date: ${transaction['date']}'),
             );
           },
         );
@@ -291,7 +299,8 @@ class _ReportingScreenState extends State<ReportingScreen> {
             final transaction = cashOut[index];
             return ListTile(
               title: Text('Amount: ${transaction['amount']}'),
-              subtitle: Text('Category: ${transaction['expenseCategory']}, Date: ${transaction['date']}'),
+              subtitle: Text(
+                  'Category: ${transaction['expenseCategory']}, Date: ${transaction['date']}'),
             );
           },
         );
